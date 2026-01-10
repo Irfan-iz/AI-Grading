@@ -1,0 +1,13 @@
+scikit-learn
+pandas
+numpy
+joblib
+sentence-transformers
+transformers
+torch
+
+Install: "Run pip install -r requirements.txt to get the necessary libraries." (or just copy paste)
+
+Place: "Put all 4 files in the same folder as your website backend script."
+
+Run: "To use it, just add import integrity_module in your Python code and call integrity_module.evaluate_submission_complete(student_name, answer, rubric)."
