@@ -4,6 +4,16 @@ from integrity_module import grade_submission
 # --- PAGE SETUP ---
 st.set_page_config(page_title="NLP Auto-Grader", layout="centered")
 st.title("🤖 AI-Powered Exam Grader")
+# --- PROJECT INFO (Requirement ii) ---
+with st.expander("ℹ️ About this Project"):
+    st.markdown("""
+    This system is an **Automated Essay Scoring & Integrity Portal** developed for the **BAXI 3413 NLP Course**.
+    
+    **Features:**
+    * **Auto-Grading:** Uses `Sentence-Transformers` (SBERT) to calculate semantic similarity between the student answer and the rubric.
+    * **AI Detection:** Uses a `Scikit-Learn` classifier trained on human vs. AI text.
+    * **Plagiarism Check:** Compares submissions against an internal knowledge database.
+    """)
 st.markdown("Automated Essay Scoring, AI Detection & Plagiarism Check")
 
 # --- INPUTS ---
@@ -116,4 +126,5 @@ with st.sidebar:
         bot_reply = get_chatbot_response(user_input)
         
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+
         st.chat_message("assistant").write(bot_reply)
