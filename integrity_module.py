@@ -181,22 +181,47 @@ def grade_submission(student_text, teacher_rubric):
         
         # ... (Keep all your existing imports and functions) ...
 
-# --- CHATBOT KNOWLEDGE BASE ---
+# --- CHATBOT KNOWLEDGE BASE (Requirement iv & v) ---
 FAQ_DATA = {
+    # 1. Identity & Purpose
     "What is this website?": 
-        "This is an Integrity Checker system. It compares your uploaded documents against a database to detect potential plagiarism.",
-    
-    "How do I use this?": 
-        "Simply type a student's answer and the teacher's rubric into the text boxes, then click 'Grade Submission'.",
-    
-    "What does the score mean?": 
-        "The similarity score shows how closely the student's answer matches the teacher's rubric. Higher is better.",
-    
-    "How does plagiarism check work?": 
-        "We compare the answer against an internal database of known texts using AI to find semantic matches.",
-    
-    "Is my data safe?": 
-        "Yes, this runs locally on your machine. No data is sent to the cloud."
+        "This is an AI Grading & Integrity Portal for BAXI 3413. It detects plagiarism, checks for AI-generated text, and grades essays automatically.",
+
+    # 2. Usage Guide (Guides user to input)
+    "How do I use this system?": 
+        "Enter the student's name, the grading rubric, and the answer in the text boxes on the main page, then click the 'Grade Submission' button.",
+
+    # 3. Grading Logic
+    "What does the grading score mean?": 
+        "The score (0-100) represents the semantic similarity between the student's answer and the teacher's rubric. A higher score means a better match.",
+
+    # 4. Technical Details (NLP Models)
+    "What AI models are used here?": 
+        "We use 'all-MiniLM-L6-v2' (SBERT) for semantic similarity and plagiarism checks, and a custom Scikit-Learn classifier for AI detection.",
+
+    # 5. Plagiarism Explanation
+    "How does the plagiarism check work?": 
+        "The system scans the student's text against our internal database of known sources. If a high similarity is found, the specific source is flagged.",
+
+    # 6. AI Detection Logic
+    "How do you detect AI-generated text?": 
+        "We use a Machine Learning classifier trained on patterns common in AI writing, such as low perplexity and specific sentence structures.",
+
+    # 7. Troubleshooting (Guides user to fix input)
+    "Why did I get a 'N/A' or error result?": 
+        "This usually happens if the input text is too short or empty. Please ensure the answer is at least one full sentence.",
+
+    # 8. Privacy & Security
+    "Is the submitted data safe?": 
+        "Yes, all processing is done locally on the server. We do not store essays or rubrics in any external cloud database.",
+
+    # 9. Scope of the System
+    "Can I use this for coding or math questions?": 
+        "This system is optimized for natural language essays and text explanations. It may not grade code snippets or mathematical formulas accurately.",
+
+    # 10. Authorship
+    "Who developed this project?": 
+        "This system was developed by our group for the BAXI 3413 Natural Language Processing course (Semester 1, 2025/2026)."
 }
 
 def get_chatbot_response(user_query):
@@ -229,4 +254,5 @@ def get_chatbot_response(user_query):
     
     # Return the matching answer
     matching_question = questions[best_score_index]
+
     return FAQ_DATA[matching_question]
