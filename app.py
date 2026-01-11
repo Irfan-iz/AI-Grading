@@ -4,6 +4,7 @@ from integrity_module import grade_submission
 # --- PAGE SETUP ---
 st.set_page_config(page_title="NLP Auto-Grader", layout="centered")
 st.title("🤖 AI-Powered Exam Grader")
+st.markdown("Automated Essay Scoring, AI Detection & Plagiarism Check")
 # --- PROJECT INFO (Requirement ii) ---
 with st.expander("ℹ️ About this Project"):
     st.markdown("""
@@ -14,7 +15,6 @@ with st.expander("ℹ️ About this Project"):
     * **AI Detection:** Uses a `Scikit-Learn` classifier trained on human vs. AI text.
     * **Plagiarism Check:** Compares submissions against an internal knowledge database.
     """)
-st.markdown("Automated Essay Scoring, AI Detection & Plagiarism Check")
 
 # --- INPUTS ---
 with st.form("exam_form"):
@@ -128,3 +128,4 @@ with st.sidebar:
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
 
         st.chat_message("assistant").write(bot_reply)
+
