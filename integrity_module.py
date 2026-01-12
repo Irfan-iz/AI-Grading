@@ -84,7 +84,7 @@ def check_plagiarism(text):
     internet_database = []
     
     # 1. Define the path to your .txt file
-    txt_path = os.path.join(os.path.dirname(__file__), 'AllCombined.txt')
+    txt_path = os.path.join(os.path.dirname(__file__), 'plagiarism_data.txt')
 
     if os.path.exists(txt_path):
         try:
@@ -275,5 +275,6 @@ def get_chatbot_response(user_query):
     matching_question = questions[best_score_index]
 
     return FAQ_DATA[matching_question]
+
 
 
