@@ -1,7 +1,6 @@
 import joblib
 import numpy as np
 import re
-import os
 from sentence_transformers import SentenceTransformer, util
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -9,14 +8,29 @@ from sklearn.metrics.pairwise import cosine_similarity
 AI_MODEL_PATH = "ai_detector_classifier.joblib"
 VECTORIZER_PATH = "ai_detector_vectorizer.joblib"
 SBERT_MODEL_NAME = "all-MiniLM-L6-v2"
-PLAGIARISM_FILE = "plagiarism_data.txt"
 
 # --- GLOBAL VARIABLES ---
 AI_CLF = None
 AI_VECT = None
 SBERT_MODEL = None
-PLAGIARISM_DB = []       # Stores the text sentences
-DB_EMBEDDINGS = None     # Stores the calculated math (Vectors) for speed
+
+# --- 🚀 FAST MANUAL DATABASE (No text file reading) ---
+# Add your specific sentences here. This runs instantly.
+PLAGIARISM_DB = [
+    # 1. The Definitions you uploaded
+    "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines that are programmed to think like humans and mimic their actions.",
+    "The term may also be applied to any machine that exhibits traits associated with a human mind such as learning and problem-solving.",
+    
+    # 2. General Knowledge (Safe to keep)
+    "Machine learning is a branch of artificial intelligence (AI) and computer science which focuses on the use of data and algorithms to imitate the way that humans learn.",
+    "Supervised learning algorithms are designed to learn from labeled training data to predict outcomes or classify data.",
+    
+    # 3. Add more sentences here if you want...
+    "Deep learning is a subset of machine learning, which is essentially a neural network with three or more layers."
+]
+
+# We will store the pre-calculated math here
+DB_EMBEDDINGS = None
 
 # --- GRADE THRESHOLDS ---
 GRADE_A_THRESHOLD = 0.75
@@ -27,31 +41,20 @@ GRADE_E_THRESHOLD = 0.20
 
 # --- CHATBOT KNOWLEDGE BASE ---
 FAQ_DATA = {
-    "What is this website?": 
-        "This is an AI Grading & Integrity Portal for BAXI 3413. It detects plagiarism, checks for AI-generated text, and grades essays automatically.",
-    "How do I use this system?": 
-        "Enter the student's name, the grading rubric, and the answer in the text boxes on the main page, then click the 'Grade Submission' button.",
-    "What does the grading score mean?": 
-        "The score (0-100) represents the semantic similarity between the student's answer and the teacher's rubric. A higher score means a better match.",
-    "What AI models are used here?": 
-        "We use 'all-MiniLM-L6-v2' (SBERT) for semantic similarity and plagiarism checks, and a custom Scikit-Learn classifier for AI detection.",
-    "How does the plagiarism check work?": 
-        "The system scans the student's text against our internal database of known sources. If a high similarity is found, the specific source is flagged.",
-    "How do you detect AI-generated text?": 
-        "We use a Machine Learning classifier trained on patterns common in AI writing, such as low perplexity and specific sentence structures.",
-    "Why did I get a 'N/A' or error result?": 
-        "This usually happens if the input text is too short or empty. Please ensure the answer is at least one full sentence.",
-    "Is the submitted data safe?": 
-        "Yes, all processing is done locally on the server. We do not store essays or rubrics in any external cloud database.",
-    "Can I use this for coding or math questions?": 
-        "This system is optimized for natural language essays and text explanations. It may not grade code snippets or mathematical formulas accurately.",
-    "Who developed this project?": 
-        "This system was developed by our group for the BAXI 3413 Natural Language Processing course (Semester 1, 2025/2026)."
+    "What is this website?": "This is an AI Grading & Integrity Portal for BAXI 3413.",
+    "How do I use this system?": "Enter the student's name, rubric, and answer, then click 'Grade Submission'.",
+    "What does the grading score mean?": "The score (0-100) represents the semantic similarity to the rubric.",
+    "What AI models are used?": "We use 'all-MiniLM-L6-v2' (SBERT) and Scikit-Learn.",
+    "How does plagiarism work?": "It scans text against an internal database of known academic sources.",
+    "How do you detect AI?": "We use a classifier trained on human vs. AI writing patterns.",
+    "Why did I get N/A?": "The input might be too short. Please write at least one full sentence.",
+    "Is my data safe?": "Yes, all processing is done locally on this server.",
+    "Who developed this?": "Developed by the BAXI 3413 NLP Group (Session 2025/2026)."
 }
 
 def load_models():
-    """Loads models AND pre-calculates plagiarism vectors for speed."""
-    global AI_CLF, AI_VECT, SBERT_MODEL, PLAGIARISM_DB, DB_EMBEDDINGS
+    """Loads models and pre-calculates the manual database."""
+    global AI_CLF, AI_VECT, SBERT_MODEL, DB_EMBEDDINGS
     
     # 1. Load AI Detection Models
     if AI_CLF is None:
@@ -66,55 +69,20 @@ def load_models():
         print("Loading SBERT Model...")
         try:
             SBERT_MODEL = SentenceTransformer(SBERT_MODEL_NAME)
+            
+            # 3. Pre-Calculate the Manual List (Instant)
+            print(f"Optimizing: Calculating vectors for {len(PLAGIARISM_DB)} sentences...")
+            DB_EMBEDDINGS = SBERT_MODEL.encode(PLAGIARISM_DB, convert_to_tensor=True)
         except Exception as e:
             print(f"Error loading SBERT: {e}")
 
-    # 3. Load & Pre-Calculate Plagiarism Database
-    if not PLAGIARISM_DB:
-        print("Processing Plagiarism Database...")
-        txt_path = os.path.join(os.path.dirname(__file__), PLAGIARISM_FILE)
-        
-        # Read the file
-        raw_text = ""
-        if os.path.exists(txt_path):
-            try:
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    raw_text = f.read()
-            except Exception as e:
-                print(f"Error reading text file: {e}")
-        
-        # Process Content
-        if not raw_text:
-            print("Warning: plagiarism_data.txt not found. Using fallback.")
-            PLAGIARISM_DB = [
-                "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines.",
-                "Machine learning is a branch of artificial intelligence (AI) and computer science.",
-                "Supervised learning algorithms are designed to learn from labeled training data."
-            ]
-        else:
-            # Split by period to get sentences
-            sentences = raw_text.split('.')
-            # Filter short sentences
-            PLAGIARISM_DB = [s.strip() for s in sentences if len(s.strip()) > 20]
-
-        # --- OPTIMIZATION: Calculate Vectors ONCE ---
-        if SBERT_MODEL and PLAGIARISM_DB:
-            try:
-                DB_EMBEDDINGS = SBERT_MODEL.encode(PLAGIARISM_DB, convert_to_tensor=True)
-                print(f"Optimized: Pre-calculated {len(PLAGIARISM_DB)} vectors.")
-            except Exception as e:
-                print(f"Error pre-calculating embeddings: {e}")
-
 def normalize_text(text):
-    """Cleans text for better comparison."""
     if not isinstance(text, str): return ""
     return re.sub(r'[^\w\s]', '', text.lower().strip())
 
 def check_ai_generated(text):
-    """Detects if text is AI-generated."""
     if AI_CLF is None: load_models()
     if not text or AI_CLF is None: return {"is_ai_generated": False, "ai_confidence_of_ai": 0.0}
-    
     try:
         vec = AI_VECT.transform([text])
         prob = AI_CLF.predict_proba(vec)[0][1]
@@ -123,17 +91,17 @@ def check_ai_generated(text):
         return {"is_ai_generated": False, "ai_confidence_of_ai": 0.0}
 
 def check_plagiarism(text):
-    """Checks for plagiarism using PRE-CALCULATED embeddings (Fast)."""
+    """Checks against the manual PLAGIARISM_DB list."""
     if SBERT_MODEL is None or DB_EMBEDDINGS is None: load_models()
     
-    if not text or len(PLAGIARISM_DB) == 0:
+    if not text:
         return {"is_plagiarized": False, "plagiarism_score": 0.0, "source": None}
 
     try:
-        # Only encode the ONE student sentence (Fast)
+        # Encode the student's text
         student_emb = SBERT_MODEL.encode(text, convert_to_tensor=True)
         
-        # Compare against the PRE-CALCULATED database (Instant)
+        # Compare against the pre-calculated list
         cosine_scores = util.pytorch_cos_sim(student_emb, DB_EMBEDDINGS)
         
         # Find best match
@@ -141,7 +109,7 @@ def check_plagiarism(text):
         max_score = cosine_scores[0][best_match_idx].item()
         best_source = PLAGIARISM_DB[best_match_idx]
 
-        # Threshold: > 0.85 means it's likely copied
+        # Threshold: 0.85 (85%)
         is_plag = True if max_score > 0.85 else False
 
         return {
@@ -154,20 +122,11 @@ def check_plagiarism(text):
         return {"is_plagiarized": False, "plagiarism_score": 0.0, "source": None}
 
 def grade_submission(student_text, teacher_rubric):
-    """Main function called by App.py."""
     load_models()
-    
-    # Safety Check
-    if not student_text or not teacher_rubric:
-        return {
-            "grading_result": {"grade": "N/A", "similarity_score": 0.0},
-            "final_points": 0,
-            "ai_result": {"is_ai_generated": False, "ai_confidence_of_ai": 0.0},
-            "plagiarism_result": {"is_plagiarized": False, "plagiarism_score": 0.0}
-        }
+    if not student_text or not teacher_rubric: return {}
 
     try:
-        # 1. Grading
+        # Grading
         embeddings = SBERT_MODEL.encode([student_text, teacher_rubric])
         similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
         dynamic_score = min(int(similarity * 100), 100)
@@ -180,7 +139,7 @@ def grade_submission(student_text, teacher_rubric):
 
         grading_result = {"grade": grade, "similarity_score": float(similarity)}
 
-        # 2. Checks
+        # Checks
         ai_result = check_ai_generated(student_text)
         plagiarism_result = check_plagiarism(student_text)
 
@@ -192,28 +151,14 @@ def grade_submission(student_text, teacher_rubric):
         }
     except Exception as e:
         print(f"Grading Error: {e}")
-        return {
-            "grading_result": {"grade": "Error", "similarity_score": 0.0},
-            "final_points": 0,
-            "ai_result": {"is_ai_generated": False},
-            "plagiarism_result": {"is_plagiarized": False}
-        }
+        return {}
 
 def get_chatbot_response(user_query):
-    """Answers user questions."""
     if SBERT_MODEL is None: load_models()
-    
     questions = list(FAQ_DATA.keys())
-    
-    # Simple semantic search
-    query_emb = SBERT_MODEL.encode(user_query, convert_to_tensor=True)
-    question_embs = SBERT_MODEL.encode(questions, convert_to_tensor=True)
-    
-    scores = util.pytorch_cos_sim(query_emb, question_embs)[0]
+    q_embs = SBERT_MODEL.encode(questions, convert_to_tensor=True)
+    u_emb = SBERT_MODEL.encode(user_query, convert_to_tensor=True)
+    scores = util.pytorch_cos_sim(u_emb, q_embs)[0]
     best_idx = np.argmax(scores.cpu().numpy())
-    best_score = scores[best_idx].item()
-    
-    if best_score < 0.4:
-        return "I'm sorry, I don't understand. Try asking about grading, plagiarism, or how to use the app."
-    
+    if scores[best_idx] < 0.4: return "I'm sorry, I don't understand."
     return FAQ_DATA[questions[best_idx]]
