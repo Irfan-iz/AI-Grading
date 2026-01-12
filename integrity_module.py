@@ -1,7 +1,7 @@
 import joblib
 import numpy as np
 import re
-import os  # <--- Added for file path handling
+import os
 from sentence_transformers import SentenceTransformer, util
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -9,13 +9,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 AI_MODEL_PATH = "ai_detector_classifier.joblib"
 VECTORIZER_PATH = "ai_detector_vectorizer.joblib"
 SBERT_MODEL_NAME = "all-MiniLM-L6-v2"
-PLAGIARISM_FILE = "plagiarism_data.txt" # <--- Name of your text file
+PLAGIARISM_FILE = "plagiarism_data.txt"
 
-# Global variables to hold loaded models
+# --- GLOBAL VARIABLES ---
 AI_CLF = None
 AI_VECT = None
 SBERT_MODEL = None
-PLAGIARISM_DB = [] # <--- New global to hold the sentences
+PLAGIARISM_DB = []       # Stores the text sentences
+DB_EMBEDDINGS = None     # Stores the calculated math (Vectors) for speed
 
 # --- GRADE THRESHOLDS ---
 GRADE_A_THRESHOLD = 0.75
@@ -49,16 +50,16 @@ FAQ_DATA = {
 }
 
 def load_models():
-    """Loads the AI models, SBERT, and the Plagiarism Database into memory."""
-    global AI_CLF, AI_VECT, SBERT_MODEL, PLAGIARISM_DB
+    """Loads models AND pre-calculates plagiarism vectors for speed."""
+    global AI_CLF, AI_VECT, SBERT_MODEL, PLAGIARISM_DB, DB_EMBEDDINGS
     
     # 1. Load AI Detection Models
-    if AI_CLF is None or AI_VECT is None:
+    if AI_CLF is None:
         try:
             AI_CLF = joblib.load(AI_MODEL_PATH)
             AI_VECT = joblib.load(VECTORIZER_PATH)
         except Exception as e:
-            print(f"Warning: Could not load AI models. Make sure .joblib files exist. {e}")
+            print(f"Warning: AI models missing. {e}")
 
     # 2. Load SBERT Model
     if SBERT_MODEL is None:
@@ -66,96 +67,82 @@ def load_models():
         try:
             SBERT_MODEL = SentenceTransformer(SBERT_MODEL_NAME)
         except Exception as e:
-            print(f"Warning: Could not load SBERT model: {e}")
+            print(f"Error loading SBERT: {e}")
 
-    # 3. Load Plagiarism Database (The Fix!)
-    # We load this once so we don't have to read the file every time a user clicks "Grade"
+    # 3. Load & Pre-Calculate Plagiarism Database
     if not PLAGIARISM_DB:
-        print("Loading Plagiarism Database...")
-        # Check if file exists in the current directory
+        print("Processing Plagiarism Database...")
         txt_path = os.path.join(os.path.dirname(__file__), PLAGIARISM_FILE)
         
+        # Read the file
+        raw_text = ""
         if os.path.exists(txt_path):
             try:
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     raw_text = f.read()
-                
-                # SPLIT LOGIC: 
-                # We split by periods (.) to get individual sentences.
-                # This ensures we match exact sentences (100% match) rather than big paragraphs (40% match).
-                sentences = raw_text.split('.')
-                
-                # Clean up and remove short/empty lines
-                PLAGIARISM_DB = [s.strip() for s in sentences if len(s.strip()) > 20]
-                print(f"Success: Loaded {len(PLAGIARISM_DB)} sentences into Plagiarism DB.")
             except Exception as e:
-                print(f"Error reading plagiarism file: {e}")
-        else:
-            # Fallback if file is missing
-            print("Warning: plagiarism_data.txt not found. Using default list.")
+                print(f"Error reading text file: {e}")
+        
+        # Process Content
+        if not raw_text:
+            # Fallback data if file is empty/missing
+            print("Warning: using fallback plagiarism data.")
             PLAGIARISM_DB = [
                 "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines.",
                 "Machine learning is a branch of artificial intelligence (AI) and computer science.",
                 "Supervised learning algorithms are designed to learn from labeled training data."
             ]
+        else:
+            # Split by period to get sentences
+            sentences = raw_text.split('.')
+            # Filter short sentences
+            PLAGIARISM_DB = [s.strip() for s in sentences if len(s.strip()) > 20]
+
+        # --- OPTIMIZATION: Calculate Vectors ONCE ---
+        if SBERT_MODEL and PLAGIARISM_DB:
+            try:
+                DB_EMBEDDINGS = SBERT_MODEL.encode(PLAGIARISM_DB, convert_to_tensor=True)
+                print(f"Optimized: Pre-calculated {len(PLAGIARISM_DB)} vectors.")
+            except Exception as e:
+                print(f"Error pre-calculating embeddings: {e}")
 
 def normalize_text(text):
     """Cleans text for better comparison."""
-    if not isinstance(text, str):
-        return ""
-    text = text.lower().strip()
-    text = re.sub(r'[^\w\s]', '', text)
-    return text
+    if not isinstance(text, str): return ""
+    return re.sub(r'[^\w\s]', '', text.lower().strip())
 
 def check_ai_generated(text):
     """Detects if text is AI-generated."""
     if AI_CLF is None: load_models()
+    if not text or AI_CLF is None: return {"is_ai_generated": False, "ai_confidence_of_ai": 0.0}
     
-    if not text or AI_CLF is None or AI_VECT is None:
-        return {"is_ai_generated": False, "ai_confidence_of_ai": 0.0}
-
     try:
-        vectorized_text = AI_VECT.transform([text])
-        prediction = AI_CLF.predict(vectorized_text)[0]
-        probabilities = AI_CLF.predict_proba(vectorized_text)
-        confidence = probabilities[0][1]
-
-        is_ai = True if confidence > 0.8 else False
-        
-        return {
-            "is_ai_generated": bool(is_ai),
-            "ai_confidence_of_ai": float(confidence)
-        }
-    except Exception as e:
-        print(f"AI Check Error: {e}")
+        vec = AI_VECT.transform([text])
+        prob = AI_CLF.predict_proba(vec)[0][1]
+        return {"is_ai_generated": prob > 0.5, "ai_confidence_of_ai": float(prob)}
+    except:
         return {"is_ai_generated": False, "ai_confidence_of_ai": 0.0}
 
 def check_plagiarism(text):
-    """Checks for plagiarism against the loaded database."""
-    if SBERT_MODEL is None: load_models()
-
-    if not text or not PLAGIARISM_DB:
+    """Checks for plagiarism using PRE-CALCULATED embeddings (Fast)."""
+    if SBERT_MODEL is None or DB_EMBEDDINGS is None: load_models()
+    
+    if not text or len(PLAGIARISM_DB) == 0:
         return {"is_plagiarized": False, "plagiarism_score": 0.0, "source": None}
 
     try:
-        # Encode student text
+        # Only encode the ONE student sentence (Fast)
         student_emb = SBERT_MODEL.encode(text, convert_to_tensor=True)
         
-        # Encode database (Batch processing is faster)
-        db_embeddings = SBERT_MODEL.encode(PLAGIARISM_DB, convert_to_tensor=True)
+        # Compare against the PRE-CALCULATED database (Instant)
+        cosine_scores = util.pytorch_cos_sim(student_emb, DB_EMBEDDINGS)
         
-        # Calculate similarity (Student vs All DB Sentences)
-        cosine_scores = util.pytorch_cos_sim(student_emb, db_embeddings)
-        
-        # Find the single highest match (Best matching sentence)
-        max_score_tensor = cosine_scores.max()
-        max_score = max_score_tensor.item()
-        
-        # Find which sentence it matched
+        # Find best match
         best_match_idx = cosine_scores.argmax().item()
+        max_score = cosine_scores[0][best_match_idx].item()
         best_source = PLAGIARISM_DB[best_match_idx]
 
-        # Threshold: 0.85 (85%) is a good cutoff for "stolen" text
+        # Threshold: > 0.85 means it's likely copied
         is_plag = True if max_score > 0.85 else False
 
         return {
@@ -168,13 +155,11 @@ def check_plagiarism(text):
         return {"is_plagiarized": False, "plagiarism_score": 0.0, "source": None}
 
 def grade_submission(student_text, teacher_rubric):
-    """
-    Main function called by App.py.
-    Orchestrates Grading, AI Detection, and Plagiarism Checking.
-    """
+    """Main function called by App.py."""
     load_models()
-
-    if not student_text or not teacher_rubric or SBERT_MODEL is None:
+    
+    # Safety Check
+    if not student_text or not teacher_rubric:
         return {
             "grading_result": {"grade": "N/A", "similarity_score": 0.0},
             "final_points": 0,
@@ -183,11 +168,9 @@ def grade_submission(student_text, teacher_rubric):
         }
 
     try:
-        # --- A. GRADING LOGIC ---
+        # 1. Grading
         embeddings = SBERT_MODEL.encode([student_text, teacher_rubric])
         similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-        
-        # Convert similarity to score
         dynamic_score = min(int(similarity * 100), 100)
         
         if dynamic_score >= 85: grade = "A (Distinction)"
@@ -195,24 +178,19 @@ def grade_submission(student_text, teacher_rubric):
         elif dynamic_score >= 55: grade = "C (Pass)"
         elif dynamic_score >= 40: grade = "D (Weak)"
         else: grade = "F (Fail)"
-            
-        grading_result = {
-            "grade": grade, 
-            "similarity_score": float(similarity)
-        }
 
-        # --- B. RUN OTHER CHECKS ---
+        grading_result = {"grade": grade, "similarity_score": float(similarity)}
+
+        # 2. Checks
         ai_result = check_ai_generated(student_text)
         plagiarism_result = check_plagiarism(student_text)
 
-        # --- C. RETURN COMBINED RESULT ---
         return {
             "grading_result": grading_result,
             "final_points": dynamic_score,
             "ai_result": ai_result,
             "plagiarism_result": plagiarism_result
         }
-
     except Exception as e:
         print(f"Grading Error: {e}")
         return {
@@ -223,7 +201,7 @@ def grade_submission(student_text, teacher_rubric):
         }
 
 def get_chatbot_response(user_query):
-    """Answers user questions using the existing SBERT model."""
+    """Answers user questions."""
     if SBERT_MODEL is None: load_models()
     
     questions = list(FAQ_DATA.keys())
