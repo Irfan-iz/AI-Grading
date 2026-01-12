@@ -76,44 +76,63 @@ def check_ai_generated(text):
         return {"is_ai_generated": False, "ai_confidence_of_ai": 0.0}
 
 def check_plagiarism(text):
-    """Checks for plagiarism and returns the MATCHED source text."""
+    """Checks for plagiarism against a TEXT file database."""
     # Ensure models are loaded
     if SBERT_MODEL is None: load_models()
 
-    internet_database = [
-        "Supervised learning algorithms are designed to learn from labeled training data.",
-        "Unsupervised learning uses machine learning algorithms to analyze and cluster unlabeled datasets.",
-        "Machine learning is a branch of artificial intelligence (AI) and computer science."
-    ]
+    # --- NEW: LOAD REAL DATABASE FROM TEXT FILE ---
+    internet_database = []
     
-    if not text or SBERT_MODEL is None:
+    # 1. Define the path to your .txt file
+    txt_path = os.path.join(os.path.dirname(__file__), 'plagiarism_data.txt')
+
+    if os.path.exists(txt_path):
+        try:
+            # 2. Open the text file safely
+            with open(txt_path, 'r', encoding='utf-8') as f:
+                # Read all lines and strip whitespace
+                lines = f.readlines()
+                
+                # Filter out empty lines or very short lines (less than 10 chars)
+                internet_database = [line.strip() for line in lines if len(line.strip()) > 10]
+                
+            # print(f"DEBUG: Loaded {len(internet_database)} sentences from text file.")
+        except Exception as e:
+            print(f"Error reading text file: {e}")
+    else:
+        print("Warning: plagiarism_data.txt not found. Using fallback.")
+        internet_database = [
+            "Supervised learning algorithms are designed to learn from labeled training data.",
+            "Unsupervised learning uses machine learning algorithms to analyze and cluster unlabeled datasets."
+        ]
+    
+    # If database is empty or text is empty, return Safe
+    if not text or not internet_database:
         return {"is_plagiarized": False, "plagiarism_score": 0.0, "source": None}
 
     try:
         student_emb = SBERT_MODEL.encode(text, convert_to_tensor=True)
-        max_score = 0.0
-        best_match_source = None  # <--- New variable to track the culprit
         
-        for source in internet_database:
-            source_emb = SBERT_MODEL.encode(source, convert_to_tensor=True)
-            score = util.pytorch_cos_sim(student_emb, source_emb).item()
-            
-            # If this sentence is a better match than the last one, remember it
-            if score > max_score:
-                max_score = score
-                best_match_source = source 
+        # Calculate similarity against ALL database lines
+        source_embs = SBERT_MODEL.encode(internet_database, convert_to_tensor=True)
+        scores = util.pytorch_cos_sim(student_emb, source_embs)[0]
+
+        # Find the single highest score
+        max_score_idx = np.argmax(scores.cpu().numpy())
+        max_score = scores[max_score_idx].item()
+        best_match_source = internet_database[max_score_idx]
         
+        # Threshold: 0.85 means 85% similar
         is_plag = True if max_score > 0.85 else False
 
         return {
             "is_plagiarized": bool(is_plag),
             "plagiarism_score": float(max_score),
-            "source": best_match_source if is_plag else None # <--- Return the source text
+            "source": best_match_source if is_plag else None
         }
     except Exception as e:
         print(f"Plagiarism Check Error: {e}")
         return {"is_plagiarized": False, "plagiarism_score": 0.0, "source": None}
-
 def grade_submission(student_text, teacher_rubric):
     """
     Main function called by App.py.
@@ -256,3 +275,4 @@ def get_chatbot_response(user_query):
     matching_question = questions[best_score_index]
 
     return FAQ_DATA[matching_question]
+
