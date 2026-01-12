@@ -1,12 +1,14 @@
 import streamlit as st
-from integrity_module import grade_submission
+from integrity_module import grade_submission, get_chatbot_response
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="NLP Auto-Grader", layout="centered")
 st.title("🤖 AI-Powered Exam Grader")
 st.markdown("Automated Essay Scoring, AI Detection & Plagiarism Check")
+
 # --- PROJECT INFO (Requirement ii) ---
-with st.expander("ℹ️ About this Project"):
+# This puts the text "Project Information" beside the arrow (>>)
+with st.expander("ℹ️ Project Information"):
     st.markdown("""
     This system is an **Automated Essay Scoring & Integrity Portal** developed for the **BAXI 3413 NLP Course**.
     
@@ -33,11 +35,8 @@ if submitted:
         with st.spinner("Analyzing text..."):
             result = grade_submission(answer, rubric)
         
-       # --- SAFETY CHECK & NORMALIZATION ---
-        # If the result comes back "flat" (like in your debug info), we restructure it
-        # so the rest of the app can understand it.
+        # --- SAFETY CHECK & NORMALIZATION ---
         if result and 'grading_result' not in result:
-            # Create a fake structure to prevent errors
             result = {
                 'grading_result': {
                     'grade': result.get('grade', 'N/A'),
@@ -61,7 +60,7 @@ if submitted:
 
             col1.metric("Grade", grade)
             col2.metric("Score", f"{score} / 100")
-            col3.metric("Similarity", f"{round(similarity * 100, 1)}%")
+            col3.metric("Rubric Match", f"{round(similarity * 100, 1)}%")
             
             # Flags
             st.divider()
@@ -78,54 +77,39 @@ if submitted:
                 else:
                     c1.success(f"✅ HUMAN WRITTEN ({round(ai_conf * 100, 1)}%)")
             
-# Plagiarism Check
+            # Plagiarism Check
             if 'plagiarism_result' in result:
                 plag_data = result['plagiarism_result']
                 plag_score = plag_data.get('plagiarism_score', 0)
-                
-                # Format percentage (e.g., 0.88 -> 88.0%)
                 plag_percent = round(plag_score * 100, 1)
 
                 if plag_data.get('is_plagiarized'):
                     c2.error(f"❌ PLAGIARISM DETECTED ({plag_percent}%)")
-                    
-                    # Show the source if available
                     with c2.expander("View Source"):
                         st.caption("Matched against Internal Database:")
                         st.markdown(f"_{plag_data.get('source', 'Unknown source')}_")
                 else:
-                    # Even if it's "Original," it's helpful to see the low match %
                     c2.success(f"✅ ORIGINAL CONTENT ({plag_percent}%)")
             else:
                 c2.warning("Plagiarism check unavailable")
-                
-                # ... (Keep your existing app.py code) ...
 
 # --- CHATBOT SIDEBAR ---
-from integrity_module import get_chatbot_response
-
 with st.sidebar:
-    st.header("💬 Help Assistant")
+    # This puts "Chatbot" beside the header arrow/top area
+    st.header("💬 Chatbot")
     st.caption("Ask me about this app!")
     
-    # Initialize chat history if not exists
     if "messages" not in st.session_state:
         st.session_state["messages"] = [{"role": "assistant", "content": "Hi! How can I help you?"}]
 
-    # Display chat messages
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
 
-    # Chat Input
     if user_input := st.chat_input("Type your question..."):
-        # 1. User Message
         st.session_state.messages.append({"role": "user", "content": user_input})
         st.chat_message("user").write(user_input)
         
-        # 2. Bot Response
         bot_reply = get_chatbot_response(user_input)
         
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-
         st.chat_message("assistant").write(bot_reply)
-
