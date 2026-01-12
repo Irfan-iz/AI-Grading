@@ -84,7 +84,6 @@ if SBERT_MODEL is None: load_models()
 internet_database = []
 
 # 1. Define the path to your .txt file
-    txt_path = os.path.join(os.path.dirname(__file__), 'AllCombined.txt')
     txt_path = os.path.join(os.path.dirname(__file__), 'plagiarism_data.txt')
 
 if os.path.exists(txt_path):
@@ -276,5 +275,6 @@ return "I'm sorry, I don't understand. Try asking about grading, plagiarism, or 
 matching_question = questions[best_score_index]
 
 return FAQ_DATA[matching_question]
+
 
 
