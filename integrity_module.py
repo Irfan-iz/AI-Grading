@@ -27,17 +27,40 @@ PLAGIARISM_DB = [
     
     # 3. Add more sentences here if you want...
     "Deep learning is a subset of machine learning, which is essentially a neural network with three or more layers."
+
+    # --- AI & COMPUTER SCIENCE ---
+    "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines that are programmed to think like humans and mimic their actions.",
+    "The term may also be applied to any machine that exhibits traits associated with a human mind such as learning and problem-solving.",
+    "Machine learning is a branch of artificial intelligence (AI) and computer science which focuses on the use of data and algorithms to imitate the way that humans learn.",
+    "Supervised learning algorithms are designed to learn from labeled training data to predict outcomes or classify data.",
+    "Deep learning is a subset of machine learning, which is essentially a neural network with three or more layers.",
+    "Natural Language Processing (NLP) is a subfield of linguistics, computer science, and artificial intelligence concerned with the interactions between computers and human language.",
+    "Cloud computing is the on-demand availability of computer system resources, especially data storage and computing power, without direct active management by the user.",
+
+    # --- ENVIRONMENT & SCIENCE ---
+    "Climate change describes a change in the average conditions — such as temperature and rainfall — in a region over a long period of time.",
+    "Global warming is the long-term heating of Earth's climate system observed since the pre-industrial period (between 1850 and 1900) due to human activities.",
+    "Photosynthesis is the process by which green plants and some other organisms use sunlight to synthesize foods from carbon dioxide and water.",
+    "The water cycle describes how water evaporates from the surface of the earth, rises into the atmosphere, cools and condenses into rain or snow in clouds, and falls again to the surface.",
+    "Newton's first law states that every object will remain at rest or in uniform motion in a straight line unless compelled to change its state by the action of an external force.",
+
+    # --- HISTORY & GENERAL KNOWLEDGE ---
+    "The Industrial Revolution was the transition to new manufacturing processes in Great Britain, continental Europe, and the United States, in the period from about 1760 to sometime between 1820 and 1840.",
+    "World War II was a global war that lasted from 1939 to 1945, involving the vast majority of the world's countries—including all the great powers.",
+    "The internet is a global system of interconnected computer networks that uses the Internet protocol suite (TCP/IP) to communicate between networks and devices.",
+    "Democracy is a form of government in which the people have the authority to deliberate and decide legislation, or to choose governing officials to do so.",
+    "Globalization is the word used to describe the growing interdependence of the world's economies, cultures, and populations, brought about by cross-border trade in goods and services."
 ]
 
 # We will store the pre-calculated math here
 DB_EMBEDDINGS = None
 
 # --- GRADE THRESHOLDS ---
-GRADE_A_THRESHOLD = 0.75
-GRADE_B_THRESHOLD = 0.65
-GRADE_C_THRESHOLD = 0.50
-GRADE_D_THRESHOLD = 0.35
-GRADE_E_THRESHOLD = 0.20
+GRADE_A_THRESHOLD = 0.80
+GRADE_B_THRESHOLD = 0.60
+GRADE_C_THRESHOLD = 0.40
+GRADE_D_THRESHOLD = 0.20
+GRADE_F_THRESHOLD = 0.0
 
 # --- CHATBOT KNOWLEDGE BASE ---
 FAQ_DATA = {
@@ -162,4 +185,5 @@ def get_chatbot_response(user_query):
     best_idx = np.argmax(scores.cpu().numpy())
     if scores[best_idx] < 0.4: return "I'm sorry, I don't understand."
     return FAQ_DATA[questions[best_idx]]
+
 
