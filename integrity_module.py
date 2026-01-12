@@ -131,10 +131,10 @@ def grade_submission(student_text, teacher_rubric):
         similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
         dynamic_score = min(int(similarity * 100), 100)
         
-        if dynamic_score >= 85: grade = "A (Distinction)"
-        elif dynamic_score >= 70: grade = "B (Credit)"
-        elif dynamic_score >= 55: grade = "C (Pass)"
-        elif dynamic_score >= 40: grade = "D (Weak)"
+        if dynamic_score >= 80: grade = "A (Distinction)"
+        elif dynamic_score >= 60: grade = "B (Credit)"
+        elif dynamic_score >= 40: grade = "C (Pass)"
+        elif dynamic_score >= 20: grade = "D (Weak)"
         else: grade = "F (Fail)"
 
         grading_result = {"grade": grade, "similarity_score": float(similarity)}
@@ -162,3 +162,4 @@ def get_chatbot_response(user_query):
     best_idx = np.argmax(scores.cpu().numpy())
     if scores[best_idx] < 0.4: return "I'm sorry, I don't understand."
     return FAQ_DATA[questions[best_idx]]
+
